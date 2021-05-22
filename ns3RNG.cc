@@ -4,10 +4,40 @@
 #include "ns3/point-to-point-module.h"
 #include "ns3/applications-module.h"
 
+#include <string>
+
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("ns3RNG");
 
+void writeToFile(std::string filename, std::vector<double> data){
+    std::ofstream output;
+    std::string content;
+    output.open(filename + ".csv", std::fstream::out);
+
+    if(output.is_open()){
+        if(data.size() > 0){
+            for(uint i = 0; i < data.size(); i++){
+                content += std::to_string(data[i]);
+                content += ", ";
+            }
+        }
+        //Remove trailing whitespace and comma
+        content = content.substr(0, content.size()-2);
+        output << content;
+
+        //Close file
+        std::cout << "Succesfully written " << data.size() << " lines to " << filename << ".csv" << std::endl;
+        output.close();
+    }
+}
+
+// Return vector with LCG generated numbers
+// int seed - affects the modulo operation to generate different numbers
+// int m - the modulus
+// int a - the multiplier
+// int c - the increment
+// int n - the amount of pseudorandom values generated
 std::vector<double> LCG(int seed, int m, int a, int c, int n){
     std::vector<double> generatedValues;
 
@@ -29,11 +59,9 @@ int main (int argc, char *argv[]){
 
     std::cout << "Hello world." << std::endl;
 
-    std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 20);
+    std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 200);
 
-    for (uint i = 0; i < LCG_random_values.size(); i++){
-        std::cout << LCG_random_values[i] << ' ';
-    }
+    writeToFile("LCG", LCG_random_values);
 
 
     return 0;

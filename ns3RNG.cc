@@ -19,7 +19,7 @@ void writeToFile(std::string filename, std::vector<double> data){
         if(data.size() > 0){
             for(uint i = 0; i < data.size(); i++){
                 content += std::to_string(data[i]);
-                content += ", ";
+                content += "\n";
             }
         }
         //Remove trailing whitespace and comma
@@ -27,7 +27,7 @@ void writeToFile(std::string filename, std::vector<double> data){
         output << content;
 
         //Close file
-        std::cout << "Succesfully written " << data.size() << " lines to " << filename << ".csv" << std::endl;
+        std::cout << "Succesfully generated " << data.size() << " values to " << filename << ".csv" << std::endl;
         output.close();
     }
 }
@@ -57,9 +57,7 @@ std::vector<double> LCG(int seed, int m, int a, int c, int n){
 
 int main (int argc, char *argv[]){
 
-    std::cout << "Hello world." << std::endl;
-
-    std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 200);
+    std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 1000);
 
     writeToFile("LCG", LCG_random_values);
 

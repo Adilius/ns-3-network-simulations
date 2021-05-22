@@ -28,12 +28,13 @@ void writeToFile(std::string filename, std::vector<double> data){
     }
 }
 
-/* Return vector with LCG generated numbers
+/*
 int seed - affects the modulo operation to generate different numbers
 int m - the modulus
 int a - the multiplier
 int c - the increment
-int n - the amount of pseudorandom values generated
+int n - the amount of generated values
+Return vector with LCG generated numbers
 */
 std::vector<double> LCG(int seed, int m, int a, int c, int n){
     std::vector<double> generatedValues;
@@ -52,10 +53,18 @@ std::vector<double> LCG(int seed, int m, int a, int c, int n){
     return generatedValues;
 }
 
+/*
+double min - lower bound
+double max - upper bound
+int n - the amount of generated values
+Return vector with URV generated values
+*/
 std::vector<double> URV(double min, double max, int n){
     std::vector<double> generatedValues;
 
     Ptr<UniformRandomVariable> URV = CreateObject<UniformRandomVariable>();
+    URV->SetAttribute("Min", DoubleValue(min));
+    URV->SetAttribute("Max", DoubleValue(max));
 
     for(int i = 0; i < n; i++){
         generatedValues.push_back(URV->GetValue());
@@ -64,13 +73,34 @@ std::vector<double> URV(double min, double max, int n){
     return generatedValues;
 }
 
+/*
+double mean - mean value 
+double bound - upper bound
+Return vector with RVN generated values
+*/
+std::vector<double> RVN(double mean, double bound, int n){
+    std::vector<double> generatedValues;
+
+    Ptr<ExponentialRandomVariable> RVN = CreateObject<ExponentialRandomVariable>();
+    RVN->SetAttribute("Mean", DoubleValue(mean));
+    RVN->SetAttribute("Bound", DoubleValue(bound));
+
+    for(int i = 0; i < n; i++){
+        generatedValues.push_back(RVN->GetValue());
+    }
+
+    return generatedValues;
+}
+
 int main (int argc, char *argv[]){
 
     std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 1000);
-    std::vector<double> URV_random_values = URV(0,1,1000);
+    std::vector<double> URV_random_values = URV(0,1, 1000);
+    std::vector<double> RVN_random_values = RVN(0.5, 1.0, 1000);
 
     writeToFile("LCG", LCG_random_values);
     writeToFile("URV", URV_random_values);
+    writeToFile("RVN", RVN_random_values);
 
 
     return 0;

@@ -26,3 +26,8 @@ git checkout main
 `./waf --run "ns3RNG"`
 
 `python RNGplot.py ./LCG.csv`
+
+## Results
+![LCG](https://user-images.githubusercontent.com/43440295/119241584-d4b34780-bb57-11eb-9a82-ad91720f7595.png)
+![RVN](https://user-images.githubusercontent.com/43440295/119241585-d54bde00-bb57-11eb-8a94-93edfc7cbd9c.png)
+![URV](https://user-images.githubusercontent.com/43440295/119241586-d54bde00-bb57-11eb-870a-252e4502e896.png)

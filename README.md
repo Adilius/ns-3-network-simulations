@@ -24,4 +24,5 @@ git checkout main
 
 ## Run
 `./waf --run "ns3RNG"`
+
 `python RNGplot.py ./LCG.csv`

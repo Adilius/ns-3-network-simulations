@@ -23,6 +23,10 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("NS3QUEUESMODEL");
 
+//void TcPacketsInQueue(){}
+
+//static void received_msg(){}
+
 int
 main (int argc, char *argv[])
 {

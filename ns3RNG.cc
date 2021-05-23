@@ -2,10 +2,21 @@
 
 #include <string>
 #include <algorithm>
+#include <cmath>
 
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("ns3RNG");
+
+// Normalizes a vector with upper bound
+void normalize_vector(std::vector<double> &vec, double upper){
+    double max = *std::max_element(vec.begin(), vec.end());
+    double min = *std::min_element(vec.begin(), vec.end());
+    double delta = max - min;
+    for (uint i = 0; i < vec.size(); i++){
+        vec[i] = ((vec[i] - min)/(delta))*upper;
+    }
+}
 
 void writeToFile(std::string filename, std::vector<double> data){
     std::ofstream output;
@@ -51,12 +62,7 @@ std::vector<double> LCG(int seed, int m, int a, int c, double upper, int n){
         generatedValues.push_back((double)value);
     }
 
-    double max = *std::max_element(generatedValues.begin(), generatedValues.end());
-    double min = *std::min_element(generatedValues.begin(), generatedValues.end());
-    double delta = max - min;
-    for (int i = 0; i < n; i++){
-        generatedValues[i] = ((generatedValues[i] - min)/(delta))*upper;
-    }
+    normalize_vector(generatedValues, upper);
     
     return generatedValues;
 }
@@ -109,7 +115,7 @@ int main (int argc, char *argv[]){
     cmd.Parse(argc, argv);
 
     //Seed, modulus, multiplier, increment, upper bound, amount
-    std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 3.0, n);
+    std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 3.5, n);
     std::vector<double> URV_random_values = URV(0,1, n);
     std::vector<double> ERV_random_values = ERV(0.5, 1.0, n);
 

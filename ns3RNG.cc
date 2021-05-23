@@ -1,6 +1,7 @@
 #include "ns3/core-module.h"
 
 #include <string>
+#include <algorithm>
 
 using namespace ns3;
 
@@ -33,23 +34,30 @@ int seed - affects the modulo operation to generate different numbers
 int m - the modulus
 int a - the multiplier
 int c - the increment
+double upper - upper bound
+bool norm - normalize to [0,1]
 int n - the amount of generated values
 Return vector with LCG generated numbers
 */
-std::vector<double> LCG(int seed, int m, int a, int c, int n){
+std::vector<double> LCG(int seed, int m, int a, int c, double upper, int n){
     std::vector<double> generatedValues;
 
-    for( int i = 0; i < n; i++){
-        double max = 1.0 / (1.0 + (m + 1));
-        seed = (int)(a * seed + c) % (int)m;
+    //Initialize the seed state
+    int value = seed;
 
-        if (seed < 0){
-            seed += m;
-        }
+    for(int i = 0; i < n; i++){
+        value = (int)(a * value + c) % (int)m;
 
-        generatedValues.push_back((double)seed * max);
+        generatedValues.push_back((double)value);
     }
 
+    double max = *std::max_element(generatedValues.begin(), generatedValues.end());
+    double min = *std::min_element(generatedValues.begin(), generatedValues.end());
+    double delta = max - min;
+    for (int i = 0; i < n; i++){
+        generatedValues[i] = ((generatedValues[i] - min)/(delta))*upper;
+    }
+    
     return generatedValues;
 }
 
@@ -76,31 +84,38 @@ std::vector<double> URV(double min, double max, int n){
 /*
 double mean - mean value 
 double bound - upper bound
-Return vector with RVN generated values
+Return vector with ERV generated values
 */
-std::vector<double> RVN(double mean, double bound, int n){
+std::vector<double> ERV(double mean, double bound, int n){
     std::vector<double> generatedValues;
 
-    Ptr<ExponentialRandomVariable> RVN = CreateObject<ExponentialRandomVariable>();
-    RVN->SetAttribute("Mean", DoubleValue(mean));
-    RVN->SetAttribute("Bound", DoubleValue(bound));
+    Ptr<ExponentialRandomVariable> ERV = CreateObject<ExponentialRandomVariable>();
+    ERV->SetAttribute("Mean", DoubleValue(mean));
+    ERV->SetAttribute("Bound", DoubleValue(bound));
 
     for(int i = 0; i < n; i++){
-        generatedValues.push_back(RVN->GetValue());
+        generatedValues.push_back(ERV->GetValue());
     }
 
     return generatedValues;
 }
 
 int main (int argc, char *argv[]){
+    int n = 10000;
 
-    std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 1000);
-    std::vector<double> URV_random_values = URV(0,1, 1000);
-    std::vector<double> RVN_random_values = RVN(0.5, 1.0, 1000);
+    CommandLine cmd;
+    cmd.AddValue("n","Number of generated values", n);
+
+    cmd.Parse(argc, argv);
+
+    //Seed, modulus, multiplier, increment, upper bound, amount
+    std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 3.0, n);
+    std::vector<double> URV_random_values = URV(0,1, n);
+    std::vector<double> ERV_random_values = ERV(0.5, 1.0, n);
 
     writeToFile("LCG", LCG_random_values);
     writeToFile("URV", URV_random_values);
-    writeToFile("RVN", RVN_random_values);
+    writeToFile("ERV", ERV_random_values);
 
 
     return 0;

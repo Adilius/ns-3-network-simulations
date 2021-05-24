@@ -1,16 +1,29 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
-/*
- * Implement  the  scenario  in  ns-3.  
- * Use  the  P2P  communication  for  all  the  links.  
- * For  the  generation  of traffic, you  can  use  
- * the  UDP  Client  and  Server  Application.  
- * The  Server  application  will  need  to  be modified  
- * so  that  it  reply  only  to  a  fraction of p=0.7 of  
- * the  messages  it  receives  while  the  rest  is forwarded 
- * to the Router. You can assume that the Router will simply 
- * drop all the received messages without  taking  any  
- * action(i.e.,  we  are  not  interested in  simulating  
- * the  request messages  after  they leave the Router).
+/* TODO:
+ *
+ * First part:
+ *
+ *  - Implement  the  scenario  in  ns-3 from part 2  
+ *  - Use  the  P2P  communication  for  all  the  links.  
+ *  - For  the  generation  of traffic, you  can  use  the  UDP  Client  and  Server  Application.  
+ *      * The  Server  application  will  need  to  be modified so  that  it  reply  only  to  a  fraction of p=0.7 of 
+ *        the  messages  it  receives  while  the  rest  is forwarded to the Router.
+ *      * You can assume that the Router will simply  drop all the received messages without  taking  any  
+ *        action(i.e.,  we  are  not  interested in  simulating the  request messages  after  they leave the Router).
+ *
+ *  Second part:
+ *
+ *  Run the simulation and measure:
+ *  1. The average number of request packets queued at the link between "g" and the "server" (g -> Server)
+ *  2. The average "queueing delay" and the "total average delay" for the request packets traversing the link "f -> g" 
+ *
+ *  Third part:
+ *  - Compare the results you get from the simulation with the one you obtained in Part II.
+ *  - Measure the delay between A and the Server and between the Server and A.
+ *  - Replace each P2P link with a bus using CSMA/CD; do not change the datarate or delay.
+ *  - Run the simulation and compare the results with the one obtained with the P2P. Try to explain the difference you see.
+ *  - Run the simulation but this time use the custom PRNG that you implemented in Part I to generate the exponential packet size 
+ *    and the exponential time between packets. Which differences do you observe?
  */
 
 #include "ns3/core-module.h"

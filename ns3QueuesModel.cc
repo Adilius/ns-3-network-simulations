@@ -26,19 +26,20 @@
  *    and the exponential time between packets. Which differences do you observe?
  */
 
- #include <iostream>
- #include <fstream>
- #include <string>
- #include <cassert>
- 
- #include "ns3/core-module.h"
- #include "ns3/network-module.h"
- #include "ns3/internet-module.h"
- #include "ns3/point-to-point-module.h"
- #include "ns3/applications-module.h"
- #include "ns3/flow-monitor-helper.h"
- #include "ns3/ipv4-global-routing-helper.h"
- #include "ns3/netanim-module.h"
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <cassert>
+
+#include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/internet-module.h"
+#include "ns3/point-to-point-module.h"
+#include "ns3/applications-module.h"
+#include "ns3/flow-monitor-helper.h"
+#include "ns3/ipv4-global-routing-helper.h"
+#include "ns3/netanim-module.h"
+#include "ns3/traffic-control-module.h"
 
  /* Network
 
@@ -58,20 +59,37 @@ using namespace ns3;
 NS_LOG_COMPONENT_DEFINE ("NS3QUEUESMODEL");
 
 // TODO: void TcPacketsInQueue(){}
+void TcPacketsInQueue(QueueDiscContainer qdiscs,
+                      Ptr<OutputStreamWrapper> stream) {
+
+  uint32_t nQueueDiscs = qdiscs.GetN();
+  // nQueueDiscs size == 2
+  for (uint32_t i = 0; i < nQueueDiscs; ++i) {
+    Ptr<QueueDisc> p = qdiscs.Get(i);
+    uint32_t size = p->GetNPackets();
+    *stream->GetStream() << Simulator::Now().GetSeconds() << "\t" << size
+                         << std::endl;
+  }
+  // Get current queue size value and save to file.
+  //	Ptr<QueueDisc> p = qdiscs.Get (0);
+  //	uint32_t size = p->GetNPackets();
+  //	*stream->GetStream () << Simulator::Now ().GetSeconds () << "\t" << size
+  //<< std::endl;
+}
 
 // Forwards a packet received by the Server back to the source of the message with probability p=0.7 or to a third node R with probability 1-p.
 static void received_msg (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Packet> p, const Address &srcAddress , const Address &dstAddress)
 {
-	std::cout << "::::: A packet received at the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
+	//TODO: std::cout << "::::: A packet received at the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
 	
 	Ptr<UniformRandomVariable> rand=CreateObject<UniformRandomVariable>();
 	
-	if(rand->GetValue(0.0,1.0)<=0.7){
-		std::cout << "::::: Transmitting from Server to Router   "  << std::endl;
+	if(rand->GetValue(0.0,1.0)<=0.3){
+		//TODO: std::cout << "::::: Server Forwards the Message to Router   "  << std::endl;
 		socket1->Send (Create<Packet> (p->GetSize ()));
 	}
 	else{
-		std::cout << "::::: Transmitting from GW to Controller   "  << std::endl;
+		//TODO: std::cout << "::::: Server Replies to Sender   "  << std::endl;
 		socket2->SendTo(Create<Packet> (p->GetSize ()),0,srcAddress);
 	}
 }
@@ -79,7 +97,7 @@ static void received_msg (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Pa
 static void GenerateTraffic (Ptr<Socket> socket, Ptr<ExponentialRandomVariable> randomSize,	Ptr<ExponentialRandomVariable> randomTime)
 {
 	uint32_t pktSize = randomSize->GetInteger (); //Get random value for packet size
-	std::cout << "::::: A packet is generate at Node "<< socket->GetNode ()->GetId () << " with size " << pktSize <<" bytes ! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
+	//TODO: std::cout << "::::: A packet is generated at Node "<< socket->GetNode ()->GetId () << " with size " << pktSize <<" bytes ! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
 	
 	// We make sure that the message is at least 12 bytes. The minimum length of the UDP header. We would get error otherwise.
 	if(pktSize<12){
@@ -110,6 +128,11 @@ int main (int argc, char *argv[])
   NS_LOG_INFO ("Create nodes.");
   NodeContainer nodes;
   nodes.Create (9);
+
+  // FIXME: 
+  std::string queueSize = "1000";
+  TrafficControlHelper tch;
+  tch.SetRootQueueDisc("ns3::FifoQueueDisc", "MaxSize", StringValue(queueSize + "p"));
 
   /*
   Node index:
@@ -179,6 +202,14 @@ int main (int argc, char *argv[])
 
   NetDeviceContainer dGdS = pointToPoint.Install(nGnS);
 
+
+
+  //We have now constructed all the point-to-point links
+  //Here we set qdiscs in order to track the traffic between NodeG and the Server
+  QueueDiscContainer qdiscs_G_to_Server = tch.Install(dGdS);
+
+
+
   // Later, we add IP addresses.
   // FIXME: Check if IP address are OK 
   NS_LOG_INFO ("Assign IP Addresses.");
@@ -210,7 +241,14 @@ int main (int argc, char *argv[])
   // Creates router nodes, initialize routing database and set up the routing tables in the nodes.
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
-  // TODO: Add AsciiTracerHelper
+  // TODO: Add AsciiTracerHelper and TcPacketsInQueue function
+  AsciiTraceHelper asciiTraceHelper;
+  Ptr<OutputStreamWrapper> stream = asciiTraceHelper.CreateFileStream("p2p_queue.txt");
+
+  for (float t = 1.0; t < 10; t += 0.001) {
+    Simulator::Schedule(Seconds(t), &TcPacketsInQueue, qdiscs_G_to_Server, stream);
+  }
+  //:TODO_STOP
 
   NS_LOG_INFO ("Create Applications.");
   //
@@ -253,7 +291,7 @@ int main (int argc, char *argv[])
   // You can in alternative install two Udp Client applications 
  
   Ptr<Socket> sourceA = Socket::CreateSocket (nodes.Get (deviceA), tid);  
-  InetSocketAddress remote = InetSocketAddress (iGiS.GetAddress (1), port_number); // FIXME: Change index in GetAddress
+  InetSocketAddress remote = InetSocketAddress (iGiS.GetAddress (1), port_number);
   sourceA->Connect (remote);
 
   Ptr<Socket> sourceB= Socket::CreateSocket (nodes.Get (deviceB), tid);  
@@ -266,44 +304,31 @@ int main (int argc, char *argv[])
   sourceD->Connect (remote);
 
   //Mean inter-transmission time
-  double mean = 0.002; //2 ms
-  Ptr<ExponentialRandomVariable> randomTime = CreateObject<ExponentialRandomVariable> ();
-  randomTime->SetAttribute ("Mean", DoubleValue (mean));
-  // TODO: Add arrival rates
+  double mean_node_AB = 0.002; //2 ms
+  Ptr<ExponentialRandomVariable> randomTime_AB = CreateObject<ExponentialRandomVariable> ();
+  randomTime_AB->SetAttribute ("Mean", DoubleValue (mean_node_AB));
+
+  double mean_node_C = 0.0005; //0.5 ms
+  Ptr<ExponentialRandomVariable> randomTime_C = CreateObject<ExponentialRandomVariable> ();
+  randomTime_C->SetAttribute ("Mean", DoubleValue (mean_node_C));
+  
+  double mean_node_D = 0.001; //1 ms
+  Ptr<ExponentialRandomVariable> randomTime_D = CreateObject<ExponentialRandomVariable> ();
+  randomTime_D->SetAttribute ("Mean", DoubleValue (mean_node_D));
 
   //Mean packet time
-  mean = 100; // 100 Bytes
+  double mean = 100; // 100 Bytes
   Ptr<ExponentialRandomVariable> randomSize = CreateObject<ExponentialRandomVariable> ();
   randomSize->SetAttribute ("Mean", DoubleValue (mean));
-  // TODO: Add departure rates
 
-  Simulator::ScheduleWithContext (sourceA->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceA, randomSize, randomTime);
-  Simulator::ScheduleWithContext (sourceB->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceB, randomSize, randomTime);
-  // TODO: Add more sources
-
-
+  Simulator::ScheduleWithContext (sourceA->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceA, randomSize, randomTime_AB);
+  Simulator::ScheduleWithContext (sourceB->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceB, randomSize, randomTime_AB);
+  Simulator::ScheduleWithContext (sourceC->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceC, randomSize, randomTime_C);
+  Simulator::ScheduleWithContext (sourceD->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceD, randomSize, randomTime_D);
+  
   AsciiTraceHelper ascii;
   pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("global-routing.tr"));
   pointToPoint.EnablePcapAll ("global-routing");
-
-  /* 
-
-  AnimationInterface anim ("example.xml"); // The Filename for the trace file used by the Animator
-  anim.EnablePacketMetadata (true);	// if true enables writing the packet metadata to the XML trace file
-
-  //Helper function to set Constant Position for a given node.
-  // Parameters
-  // n	Ptr to the node
-  // x	X co-ordinate of the node
-  // y	Y co-ordinate of the node
-  anim.SetConstantPosition (nodes.Get(0), 100, -100); // FIXME: Change index of node
-  anim.SetConstantPosition (nodes.Get(1), 120, -100); // FIXME: Change index of node
-  anim.SetConstantPosition (nodes.Get(2), 140, -90);  // FIXME: Change index of node
-  anim.SetConstantPosition (nodes.Get(3), 140, -110); // FIXME: Change index of node
-  anim.SetConstantPosition (nodes.Get(4), 100, -80);  // FIXME: Change index of node
-  // TODO: Add more SetConstantPosition for each node
-
-  */
 
    // Flow Monitor
   FlowMonitorHelper flowmonHelper;
@@ -319,7 +344,7 @@ int main (int argc, char *argv[])
  
   if (enableFlowMonitor)
   {
-    flowmonHelper.SerializeToXmlFile ("example.flowmon", false, false);
+    flowmonHelper.SerializeToXmlFile ("global-routing.flowmon", false, false);
   }
  
    Simulator::Destroy ();

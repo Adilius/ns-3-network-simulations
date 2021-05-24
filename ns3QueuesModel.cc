@@ -123,18 +123,27 @@ int main (int argc, char *argv[])
   7: D 
   8: R (Router)
   */
+  int deviceA = 0;
+  int deviceB = 4;
+  int deviceC = 6;
+  int deviceD = 7;
+  int nodeE = 1;
+  int nodeF = 5;
+  int nodeG = 2;
+  int Server = 3;
+  int Router = 8;
 
-  NodeContainer nAnE = NodeContainer(nodes.Get(0), nodes.Get(1));
-  NodeContainer nEnG = NodeContainer(nodes.Get(1), nodes.Get(2));
+  NodeContainer nAnE = NodeContainer(nodes.Get(deviceA), nodes.Get(nodeE));
+  NodeContainer nEnG = NodeContainer(nodes.Get(nodeE), nodes.Get(nodeG));
 
-  NodeContainer nGnS = NodeContainer(nodes.Get(2), nodes.Get(3));
-  NodeContainer nGnR = NodeContainer(nodes.Get(2), nodes.Get(8));
+  NodeContainer nGnS = NodeContainer(nodes.Get(nodeG), nodes.Get(Server));
+  NodeContainer nGnR = NodeContainer(nodes.Get(nodeG), nodes.Get(Router));
 
-  NodeContainer nBnF = NodeContainer(nodes.Get(4), nodes.Get(5));
-  NodeContainer nCnF = NodeContainer(nodes.Get(6), nodes.Get(5));
+  NodeContainer nBnF = NodeContainer(nodes.Get(deviceB), nodes.Get(nodeF));
+  NodeContainer nCnF = NodeContainer(nodes.Get(deviceC), nodes.Get(nodeF));
 
-  NodeContainer nFnG = NodeContainer(nodes.Get(5), nodes.Get(2));
-  NodeContainer nDnG = NodeContainer(nodes.Get(7), nodes.Get(2));
+  NodeContainer nFnG = NodeContainer(nodes.Get(nodeF), nodes.Get(nodeG));
+  NodeContainer nDnG = NodeContainer(nodes.Get(deviceC), nodes.Get(nodeG));
 
   InternetStackHelper internet;
   internet.Install (nodes);
@@ -210,7 +219,7 @@ int main (int argc, char *argv[])
   uint16_t port_number = 9;  
   ApplicationContainer server_apps;
   UdpServerHelper serverS (port_number);
-  server_apps.Add(serverS.Install(nodes.Get (3)));
+  server_apps.Add(serverS.Install(nodes.Get (Server)));
 
   Ptr<UdpServer> S1 = serverS.GetServer();
 
@@ -220,12 +229,12 @@ int main (int argc, char *argv[])
   TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
 
   //Transmission Server (S)-> Router (R)
-  Ptr<Socket> source1 = Socket::CreateSocket (nodes.Get (3), tid);
+  Ptr<Socket> source1 = Socket::CreateSocket (nodes.Get (Server), tid);
   InetSocketAddress remote1 = InetSocketAddress (iGiR.GetAddress (1), port_number); // FIXME: Check index
   source1->Connect (remote1);
 
   //Transmission Server (S) -> Client (A or B)
-  Ptr<Socket> source2 = Socket::CreateSocket (nodes.Get (3), tid);
+  Ptr<Socket> source2 = Socket::CreateSocket (nodes.Get (Server), tid);
 
   S1->TraceConnectWithoutContext ("RxWithAddresses", MakeBoundCallback (&received_msg, source1, source2));
 
@@ -236,19 +245,25 @@ int main (int argc, char *argv[])
   // Creates a UdpServer application on node A,B to receive the reply from the server.
   //
   UdpServerHelper server (port_number);
-  server_apps.Add(server.Install(nodes.Get (0)));  // FIXME: Change index of node
-  server_apps.Add(server.Install(nodes.Get (1)));  // FIXME: Change index of node
+  server_apps.Add(server.Install(nodes.Get (deviceA)));  
+  server_apps.Add(server.Install(nodes.Get (deviceB)));  //FIXME: Might Not Be Used, try romving later
+  //-------------------------------Might Not Be Used-------------------------------------------
 
   // ####Using Sockets to generate traffic at node A and B  (i.e., exponential payload and inter-transmission time)####
   // You can in alternative install two Udp Client applications 
  
-  Ptr<Socket> sourceA = Socket::CreateSocket (nodes.Get (0), tid);  // FIXME: Change index of node
+  Ptr<Socket> sourceA = Socket::CreateSocket (nodes.Get (deviceA), tid);  
   InetSocketAddress remote = InetSocketAddress (iGiS.GetAddress (1), port_number); // FIXME: Change index in GetAddress
   sourceA->Connect (remote);
 
-  Ptr<Socket> sourceB= Socket::CreateSocket (nodes.Get (1), tid);  // FIXME: Change index of node
+  Ptr<Socket> sourceB= Socket::CreateSocket (nodes.Get (deviceB), tid);  
   sourceB->Connect (remote);
-  // TODO: Add sockets 
+
+  Ptr<Socket> sourceC= Socket::CreateSocket (nodes.Get (deviceC), tid);  
+  sourceC->Connect (remote);
+
+  Ptr<Socket> sourceD= Socket::CreateSocket (nodes.Get (deviceD), tid);  
+  sourceD->Connect (remote);
 
   //Mean inter-transmission time
   double mean = 0.002; //2 ms

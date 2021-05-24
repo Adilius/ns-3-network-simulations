@@ -26,11 +26,32 @@
  *    and the exponential time between packets. Which differences do you observe?
  */
 
-#include "ns3/core-module.h"
-#include "ns3/network-module.h"
-#include "ns3/internet-module.h"
-#include "ns3/point-to-point-module.h"
-#include "ns3/applications-module.h"
+ #include <iostream>
+ #include <fstream>
+ #include <string>
+ #include <cassert>
+ 
+ #include "ns3/core-module.h"
+ #include "ns3/network-module.h"
+ #include "ns3/internet-module.h"
+ #include "ns3/point-to-point-module.h"
+ #include "ns3/applications-module.h"
+ #include "ns3/flow-monitor-helper.h"
+ #include "ns3/ipv4-global-routing-helper.h"
+ #include "ns3/netanim-module.h"
+
+ /* Network
+
+             S
+  A____E____ |
+            \|
+	B____      G ___ R ___ Internet 
+		   \   / |
+			   F   | 
+	C____/     D
+
+ */
+
 
 using namespace ns3;
 
@@ -38,52 +59,244 @@ NS_LOG_COMPONENT_DEFINE ("NS3QUEUESMODEL");
 
 //void TcPacketsInQueue(){}
 
-//static void received_msg(){}
+static void received_msg (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Packet> p, const Address &srcAddress , const Address &dstAddress)
+{
+	std::cout << "::::: A packet received at the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
+	
+	Ptr<UniformRandomVariable> rand=CreateObject<UniformRandomVariable>();
+	
+	if(rand->GetValue(0.0,1.0)<=0.5){
+		std::cout << "::::: Transmitting from Server to Router   "  << std::endl;
+		socket1->Send (Create<Packet> (p->GetSize ()));
+	}
+	else{
+		std::cout << "::::: Transmitting from GW to Controller   "  << std::endl;
+		socket2->SendTo(Create<Packet> (p->GetSize ()),0,srcAddress);
+	}
+}
+
+static void GenerateTraffic (Ptr<Socket> socket, Ptr<ExponentialRandomVariable> randomSize,	Ptr<ExponentialRandomVariable> randomTime)
+{
+	uint32_t pktSize = randomSize->GetInteger (); //Get random value for packet size
+	std::cout << "::::: A packet is generate at Node "<< socket->GetNode ()->GetId () << " with size " << pktSize <<" bytes ! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
+	
+	// We make sure that the message is at least 12 bytes. The minimum length of the UDP header. We would get error otherwise.
+	if(pktSize<12){
+		pktSize=12;
+	}
+	
+	socket->Send (Create<Packet> (pktSize));
+
+	Time pktInterval = Seconds(randomTime->GetValue ()); //Get random value for next packet generation time 
+	Simulator::Schedule (pktInterval, &GenerateTraffic, socket, randomSize, randomTime); //Schedule next packet generation
+}
 
 int
 main (int argc, char *argv[])
 {
-  CommandLine cmd;
-  cmd.Parse (argc, argv);
-  
-  Time::SetResolution (Time::NS);
-  LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
-  LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
+   // Users may find it convenient to turn on explicit debugging
+   // for selected modules; the below lines suggest how to do this
+  #if 0 
+    LogComponentEnable ("SimpleGlobalRoutingExample", LOG_LEVEL_INFO);
+  #endif
+ 
+  // Set up some default values for the simulation.  Use the 
+  Config::SetDefault ("ns3::OnOffApplication::PacketSize", UintegerValue (100));
+  Config::SetDefault ("ns3::OnOffApplication::DataRate", StringValue ("50kb/s"));
 
+  bool enableFlowMonitor = true;
+
+  // Create nodes for the links
+  NS_LOG_INFO ("Create nodes.");
   NodeContainer nodes;
-  nodes.Create (2);
+  nodes.Create (9);
 
+  /*
+  Node index:
+  0: A
+  1: E
+  2: G
+  3: S (Server)
+  4: B
+  5: F
+  6: C
+  7: D 
+  8: R (Router)
+  */
+
+  NodeContainer nAnE = NodeContainer(nodes.Get(0), nodes.Get(1));
+  NodeContainer nEnG = NodeContainer(nodes.Get(1), nodes.Get(2));
+
+  NodeContainer nGnS = NodeContainer(nodes.Get(2), nodes.Get(3));
+  NodeContainer nGnR = NodeContainer(nodes.Get(2), nodes.Get(8));
+
+  NodeContainer nBnF = NodeContainer(nodes.Get(4), nodes.Get(5));
+  NodeContainer nCnF = NodeContainer(nodes.Get(6), nodes.Get(5));
+
+  NodeContainer nFnG = NodeContainer(nodes.Get(5), nodes.Get(2));
+  NodeContainer nDnG = NodeContainer(nodes.Get(7), nodes.Get(2));
+
+  InternetStackHelper internet;
+  internet.Install (nodes);
+
+  // We create the channels first without any IP addressing information
+  NS_LOG_INFO ("Create channels.");
+  // Constructing a point to point link
   PointToPointHelper pointToPoint;
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
   pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
+ 
+  NetDeviceContainer dAdE = pointToPoint.Install(nAnE);
+  NetDeviceContainer dEdG = pointToPoint.Install(nEnG);
+  NetDeviceContainer dBdF = pointToPoint.Install(nBnF);
 
-  NetDeviceContainer devices;
-  devices = pointToPoint.Install (nodes);
+  pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
+  pointToPoint.SetChannelAttribute ("Delay", StringValue ("0.5ms"));
 
-  InternetStackHelper stack;
-  stack.Install (nodes);
+  NetDeviceContainer dCdF = pointToPoint.Install(nCnF);
 
-  Ipv4AddressHelper address;
-  address.SetBase ("10.1.1.0", "255.255.255.0");
+  pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
+  pointToPoint.SetChannelAttribute ("Delay", StringValue ("1ms"));
 
-  Ipv4InterfaceContainer interfaces = address.Assign (devices);
+  NetDeviceContainer dDdG = pointToPoint.Install(nDnG);
 
-  UdpEchoServerHelper echoServer (9);
+  pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("8Mbps"));
 
-  ApplicationContainer serverApps = echoServer.Install (nodes.Get (1));
-  serverApps.Start (Seconds (1.0));
-  serverApps.Stop (Seconds (10.0));
+  NetDeviceContainer dFdG = pointToPoint.Install(nFnG);
+  NetDeviceContainer dGdR = pointToPoint.Install(nGnR);
 
-  UdpEchoClientHelper echoClient (interfaces.GetAddress (1), 9);
-  echoClient.SetAttribute ("MaxPackets", UintegerValue (1));
-  echoClient.SetAttribute ("Interval", TimeValue (Seconds (1.0)));
-  echoClient.SetAttribute ("PacketSize", UintegerValue (1024));
+  pointToPoint.SetDeviceAttribute("DataRate", StringValue("10Mbps"));
+  pointToPoint.SetQueue("ns3::DropTailQueue");
 
-  ApplicationContainer clientApps = echoClient.Install (nodes.Get (0));
-  clientApps.Start (Seconds (2.0));
-  clientApps.Stop (Seconds (10.0));
+  NetDeviceContainer dGdS = pointToPoint.Install(nGnS);
 
+  // Later, we add IP addresses.
+  // FIXME: Add correct IP address (from example file at the moment)
+  NS_LOG_INFO ("Assign IP Addresses.");
+  Ipv4AddressHelper ipv4;
+  ipv4.SetBase("10.1.1.0", "255.255.255.0");
+  Ipv4InterfaceContainer iAiE = ipv4.Assign(dAdE);
+
+  ipv4.SetBase("10.1.2.0", "255.255.255.0");
+  Ipv4InterfaceContainer iEiG = ipv4.Assign(dEdG);
+
+  ipv4.SetBase("10.1.3.0", "255.255.255.0");
+  Ipv4InterfaceContainer iBiF = ipv4.Assign(dBdF);
+
+  ipv4.SetBase("10.1.4.0", "255.255.255.0");
+  Ipv4InterfaceContainer iCiF = ipv4.Assign(dCdF);
+
+  ipv4.SetBase("10.1.5.0", "255.255.255.0");
+  Ipv4InterfaceContainer iFiG = ipv4.Assign(dFdG);
+
+  ipv4.SetBase("10.1.6.0", "255.255.255.0");
+  Ipv4InterfaceContainer iDiG = ipv4.Assign(dDdG);
+
+  ipv4.SetBase("10.1.7.0", "255.255.255.0");
+  Ipv4InterfaceContainer iGiR = ipv4.Assign(dGdR);
+
+  ipv4.SetBase("10.1.8.0", "255.255.255.0");
+  Ipv4InterfaceContainer iGiS = ipv4.Assign(dGdS);
+
+  // Create router nodes, initialize routing database and set up the routing
+  // tables in the nodes.
+  Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+
+
+  NS_LOG_INFO ("Create Applications.");
+  //
+  // Create a UdpServer application on node Server (S).
+  //
+  uint16_t port_number = 9;  
+  ApplicationContainer server_apps;
+  UdpServerHelper serverS (port_number);
+  server_apps.Add(serverS.Install(nodes.Get (3))); // FIXME: Change index of node
+
+  Ptr<UdpServer> S1 = serverS.GetServer();
+
+
+  // We Initialize the sockets responsable for transmitting messages
+
+  TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
+
+  //Transmission Server (S)-> Router (R)
+  Ptr<Socket> source1 = Socket::CreateSocket (nodes.Get (3), tid); // FIXME: Change index of node
+  InetSocketAddress remote1 = InetSocketAddress (iGiR.GetAddress (1), port_number);
+  source1->Connect (remote1);
+
+  //Transmission Server (S) -> Client (A or B)
+  Ptr<Socket> source2 = Socket::CreateSocket (nodes.Get (3), tid); // FIXME: Change index of node
+
+  S1->TraceConnectWithoutContext ("RxWithAddresses", MakeBoundCallback (&received_msg, source1, source2));
+
+  server_apps.Start (Seconds (1.0));
+  server_apps.Stop (Seconds (10.0));
+
+  //
+  // Create a UdpServer application on node A,B to receive the reply from the server.
+  //
+  UdpServerHelper server (port_number);
+  server_apps.Add(server.Install(nodes.Get (0)));  // FIXME: Change index of node
+  server_apps.Add(server.Install(nodes.Get (1)));  // FIXME: Change index of node
+
+
+
+  // ####Using Sockets to generate traffic at node A and B  (i.e., exponential payload and inter-transmission time)####
+  // You can in alternative install two Udp Client applications 
+ 
+  Ptr<Socket> sourceA = Socket::CreateSocket (nodes.Get (0), tid);  // FIXME: Change index of node
+  InetSocketAddress remote = InetSocketAddress (iGiS.GetAddress (1), port_number); // FIXME: Change index in GetAddress
+  sourceA->Connect (remote);
+
+  Ptr<Socket> sourceB= Socket::CreateSocket (nodes.Get (1), tid);  // FIXME: Change index of node
+  sourceB->Connect (remote);
+
+
+  //Mean inter-transmission time
+  double mean = 0.002; //2 ms
+  Ptr<ExponentialRandomVariable> randomTime = CreateObject<ExponentialRandomVariable> ();
+  randomTime->SetAttribute ("Mean", DoubleValue (mean));
+
+  //Mean packet time
+  mean = 100; // 100 Bytes
+  Ptr<ExponentialRandomVariable> randomSize = CreateObject<ExponentialRandomVariable> ();
+  randomSize->SetAttribute ("Mean", DoubleValue (mean));
+
+  Simulator::ScheduleWithContext (sourceA->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceA, randomSize, randomTime);
+  Simulator::ScheduleWithContext (sourceB->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceB, randomSize, randomTime);
+
+
+
+  AsciiTraceHelper ascii;
+  pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("example.tr"));
+  pointToPoint.EnablePcapAll ("example");
+
+
+  AnimationInterface anim ("example.xml");
+  anim.EnablePacketMetadata (true);
+  anim.SetConstantPosition (nodes.Get(0), 100, -100); // FIXME: Change index of node
+  anim.SetConstantPosition (nodes.Get(1), 120, -100); // FIXME: Change index of node
+  anim.SetConstantPosition (nodes.Get(2), 140, -90);  // FIXME: Change index of node
+  anim.SetConstantPosition (nodes.Get(3), 140, -110); // FIXME: Change index of node
+  anim.SetConstantPosition (nodes.Get(4), 100, -80);  // FIXME: Change index of node
+
+   // Flow Monitor
+  FlowMonitorHelper flowmonHelper;
+  if (enableFlowMonitor)
+  {
+    flowmonHelper.InstallAll ();
+  }
+ 
+  NS_LOG_INFO ("Run Simulation.");
+  Simulator::Stop (Seconds (10));
   Simulator::Run ();
-  Simulator::Destroy ();
-  return 0;
+  NS_LOG_INFO ("Done.");
+ 
+  if (enableFlowMonitor)
+  {
+    flowmonHelper.SerializeToXmlFile ("example.flowmon", false, false);
+  }
+ 
+   Simulator::Destroy ();
+   return 0;
 }

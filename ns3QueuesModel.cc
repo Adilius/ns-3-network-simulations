@@ -3,9 +3,9 @@
  *
  * First part:
  *
- *  - Implement  the  scenario  in  ns-3 from part 2  
- *  - Use  the  P2P  communication  for  all  the  links.  
- *  - For  the  generation  of traffic, you  can  use  the  UDP  Client  and  Server  Application.  
+ *  - (DONE) Implement  the  scenario  in  ns-3 from part 2  
+ *  - (DONE) Use  the  P2P  communication  for  all  the  links.  
+ *  - (DONE) For  the  generation  of traffic, you  can  use  the  UDP  Client  and  Server  Application.  
  *      * The  Server  application  will  need  to  be modified so  that  it  reply  only  to  a  fraction of p=0.7 of 
  *        the  messages  it  receives  while  the  rest  is forwarded to the Router.
  *      * You can assume that the Router will simply  drop all the received messages without  taking  any  
@@ -20,7 +20,7 @@
  *  Third part:
  *  - Compare the results you get from the simulation with the one you obtained in Part II.
  *  - Measure the delay between A and the Server and between the Server and A.
- *  - Replace each P2P link with a bus using CSMA/CD; do not change the datarate or delay.
+ *  - (Create a new file for this one) Replace each P2P link with a bus using CSMA/CD; do not change the datarate or delay
  *  - Run the simulation and compare the results with the one obtained with the P2P. Try to explain the difference you see.
  *  - Run the simulation but this time use the custom PRNG that you implemented in Part I to generate the exponential packet size 
  *    and the exponential time between packets. Which differences do you observe?
@@ -57,15 +57,16 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("NS3QUEUESMODEL");
 
-//void TcPacketsInQueue(){}
+// TODO: void TcPacketsInQueue(){}
 
+// Forwards a packet received by the Server back to the source of the message with probability p=0.7 or to a third node R with probability 1-p.
 static void received_msg (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Packet> p, const Address &srcAddress , const Address &dstAddress)
 {
 	std::cout << "::::: A packet received at the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
 	
 	Ptr<UniformRandomVariable> rand=CreateObject<UniformRandomVariable>();
 	
-	if(rand->GetValue(0.0,1.0)<=0.5){
+	if(rand->GetValue(0.0,1.0)<=0.7){
 		std::cout << "::::: Transmitting from Server to Router   "  << std::endl;
 		socket1->Send (Create<Packet> (p->GetSize ()));
 	}
@@ -91,8 +92,7 @@ static void GenerateTraffic (Ptr<Socket> socket, Ptr<ExponentialRandomVariable> 
 	Simulator::Schedule (pktInterval, &GenerateTraffic, socket, randomSize, randomTime); //Schedule next packet generation
 }
 
-int
-main (int argc, char *argv[])
+int main (int argc, char *argv[])
 {
    // Users may find it convenient to turn on explicit debugging
    // for selected modules; the below lines suggest how to do this
@@ -171,7 +171,7 @@ main (int argc, char *argv[])
   NetDeviceContainer dGdS = pointToPoint.Install(nGnS);
 
   // Later, we add IP addresses.
-  // FIXME: Add correct IP address (from example file at the moment)
+  // FIXME: Check if IP address are OK 
   NS_LOG_INFO ("Assign IP Addresses.");
   Ipv4AddressHelper ipv4;
   ipv4.SetBase("10.1.1.0", "255.255.255.0");
@@ -198,19 +198,19 @@ main (int argc, char *argv[])
   ipv4.SetBase("10.1.8.0", "255.255.255.0");
   Ipv4InterfaceContainer iGiS = ipv4.Assign(dGdS);
 
-  // Create router nodes, initialize routing database and set up the routing
-  // tables in the nodes.
+  // Creates router nodes, initialize routing database and set up the routing tables in the nodes.
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
+  // TODO: Add AsciiTracerHelper
 
   NS_LOG_INFO ("Create Applications.");
   //
-  // Create a UdpServer application on node Server (S).
+  // Creates a UdpServer application on node Server (S).
   //
   uint16_t port_number = 9;  
   ApplicationContainer server_apps;
   UdpServerHelper serverS (port_number);
-  server_apps.Add(serverS.Install(nodes.Get (3))); // FIXME: Change index of node
+  server_apps.Add(serverS.Install(nodes.Get (3)));
 
   Ptr<UdpServer> S1 = serverS.GetServer();
 
@@ -220,12 +220,12 @@ main (int argc, char *argv[])
   TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
 
   //Transmission Server (S)-> Router (R)
-  Ptr<Socket> source1 = Socket::CreateSocket (nodes.Get (3), tid); // FIXME: Change index of node
-  InetSocketAddress remote1 = InetSocketAddress (iGiR.GetAddress (1), port_number);
+  Ptr<Socket> source1 = Socket::CreateSocket (nodes.Get (3), tid);
+  InetSocketAddress remote1 = InetSocketAddress (iGiR.GetAddress (1), port_number); // FIXME: Check index
   source1->Connect (remote1);
 
   //Transmission Server (S) -> Client (A or B)
-  Ptr<Socket> source2 = Socket::CreateSocket (nodes.Get (3), tid); // FIXME: Change index of node
+  Ptr<Socket> source2 = Socket::CreateSocket (nodes.Get (3), tid);
 
   S1->TraceConnectWithoutContext ("RxWithAddresses", MakeBoundCallback (&received_msg, source1, source2));
 
@@ -233,13 +233,11 @@ main (int argc, char *argv[])
   server_apps.Stop (Seconds (10.0));
 
   //
-  // Create a UdpServer application on node A,B to receive the reply from the server.
+  // Creates a UdpServer application on node A,B to receive the reply from the server.
   //
   UdpServerHelper server (port_number);
   server_apps.Add(server.Install(nodes.Get (0)));  // FIXME: Change index of node
   server_apps.Add(server.Install(nodes.Get (1)));  // FIXME: Change index of node
-
-
 
   // ####Using Sockets to generate traffic at node A and B  (i.e., exponential payload and inter-transmission time)####
   // You can in alternative install two Udp Client applications 
@@ -250,35 +248,47 @@ main (int argc, char *argv[])
 
   Ptr<Socket> sourceB= Socket::CreateSocket (nodes.Get (1), tid);  // FIXME: Change index of node
   sourceB->Connect (remote);
-
+  // TODO: Add sockets 
 
   //Mean inter-transmission time
   double mean = 0.002; //2 ms
   Ptr<ExponentialRandomVariable> randomTime = CreateObject<ExponentialRandomVariable> ();
   randomTime->SetAttribute ("Mean", DoubleValue (mean));
+  // TODO: Add arrival rates
 
   //Mean packet time
   mean = 100; // 100 Bytes
   Ptr<ExponentialRandomVariable> randomSize = CreateObject<ExponentialRandomVariable> ();
   randomSize->SetAttribute ("Mean", DoubleValue (mean));
+  // TODO: Add departure rates
 
   Simulator::ScheduleWithContext (sourceA->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceA, randomSize, randomTime);
   Simulator::ScheduleWithContext (sourceB->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceB, randomSize, randomTime);
-
+  // TODO: Add more sources
 
 
   AsciiTraceHelper ascii;
-  pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("example.tr"));
-  pointToPoint.EnablePcapAll ("example");
+  pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("global-routing.tr"));
+  pointToPoint.EnablePcapAll ("global-routing");
 
+  /* 
 
-  AnimationInterface anim ("example.xml");
-  anim.EnablePacketMetadata (true);
+  AnimationInterface anim ("example.xml"); // The Filename for the trace file used by the Animator
+  anim.EnablePacketMetadata (true);	// if true enables writing the packet metadata to the XML trace file
+
+  //Helper function to set Constant Position for a given node.
+  // Parameters
+  // n	Ptr to the node
+  // x	X co-ordinate of the node
+  // y	Y co-ordinate of the node
   anim.SetConstantPosition (nodes.Get(0), 100, -100); // FIXME: Change index of node
   anim.SetConstantPosition (nodes.Get(1), 120, -100); // FIXME: Change index of node
   anim.SetConstantPosition (nodes.Get(2), 140, -90);  // FIXME: Change index of node
   anim.SetConstantPosition (nodes.Get(3), 140, -110); // FIXME: Change index of node
   anim.SetConstantPosition (nodes.Get(4), 100, -80);  // FIXME: Change index of node
+  // TODO: Add more SetConstantPosition for each node
+
+  */
 
    // Flow Monitor
   FlowMonitorHelper flowmonHelper;

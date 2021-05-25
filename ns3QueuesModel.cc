@@ -32,6 +32,7 @@
 #include <cassert>
 
 #include "ns3/core-module.h"
+#include "ns3/csma-module.h"
 #include "ns3/network-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/point-to-point-module.h"
@@ -58,38 +59,31 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("NS3QUEUESMODEL");
 
-// TODO: void TcPacketsInQueue(){}
-void TcPacketsInQueue(QueueDiscContainer qdiscs,
-                      Ptr<OutputStreamWrapper> stream) {
+void TcPacketsInQueue(QueueDiscContainer qdiscs, Ptr<OutputStreamWrapper> streamTrFile, Ptr<OutputStreamWrapper> streamTxt) {
 
   uint32_t nQueueDiscs = qdiscs.GetN();
-  // nQueueDiscs size == 2
   for (uint32_t i = 0; i < nQueueDiscs; ++i) {
     Ptr<QueueDisc> p = qdiscs.Get(i);
     uint32_t size = p->GetNPackets();
-    *stream->GetStream() << Simulator::Now().GetSeconds() << "\t" << size
-                         << std::endl;
+    *streamTrFile->GetStream() << Simulator::Now().GetSeconds() << "\t Packets in queue: " << size << std::endl;
+    *streamTxt->GetStream() << Simulator::Now().GetSeconds() << "\t Packets in queue: " << size << std::endl;
+    std::cout << Simulator::Now().GetSeconds() << "\t Packets in queue: " << size << std::endl;
   }
-  // Get current queue size value and save to file.
-  //	Ptr<QueueDisc> p = qdiscs.Get (0);
-  //	uint32_t size = p->GetNPackets();
-  //	*stream->GetStream () << Simulator::Now ().GetSeconds () << "\t" << size
-  //<< std::endl;
 }
 
 // Forwards a packet received by the Server back to the source of the message with probability p=0.7 or to a third node R with probability 1-p.
 static void received_msg (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Packet> p, const Address &srcAddress , const Address &dstAddress)
 {
-	//TODO: std::cout << "::::: A packet received at the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
+	//std::cout << "::::: A packet received at the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
 	
 	Ptr<UniformRandomVariable> rand=CreateObject<UniformRandomVariable>();
 	
 	if(rand->GetValue(0.0,1.0)<=0.3){
-		//TODO: std::cout << "::::: Server Forwards the Message to Router   "  << std::endl;
+		//std::cout << "::::: Server Forwards the Message to Router   "  << std::endl;
 		socket1->Send (Create<Packet> (p->GetSize ()));
 	}
 	else{
-		//TODO: std::cout << "::::: Server Replies to Sender   "  << std::endl;
+		//std::cout << "::::: Server Replies to Sender   "  << std::endl;
 		socket2->SendTo(Create<Packet> (p->GetSize ()),0,srcAddress);
 	}
 }
@@ -97,7 +91,7 @@ static void received_msg (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Pa
 static void GenerateTraffic (Ptr<Socket> socket, Ptr<ExponentialRandomVariable> randomSize,	Ptr<ExponentialRandomVariable> randomTime)
 {
 	uint32_t pktSize = randomSize->GetInteger (); //Get random value for packet size
-	//TODO: std::cout << "::::: A packet is generated at Node "<< socket->GetNode ()->GetId () << " with size " << pktSize <<" bytes ! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
+	//std::cout << "::::: A packet is generated at Node "<< socket->GetNode ()->GetId () << " with size " << pktSize <<" bytes ! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
 	
 	// We make sure that the message is at least 12 bytes. The minimum length of the UDP header. We would get error otherwise.
 	if(pktSize<12){
@@ -124,36 +118,34 @@ int main (int argc, char *argv[])
 
   bool enableFlowMonitor = true;
 
+  std::string model = "P2P";
+
+  CommandLine cmd;
+  cmd.AddValue ("Model", "Choose \"P2P\" or \"CSMA\"", model);
+  
+  cmd.Parse(argc, argv);
+
+  //Safety for making sure Model used is correct. P2P used otherwise.
+  if(model == "P2P" || model == "CSMA"){}
+  else{model = "P2P";}
+  std::cout << model << " model is running" << std::endl;
+
   // Create nodes for the links
   NS_LOG_INFO ("Create nodes.");
   NodeContainer nodes;
   nodes.Create (9);
 
-  // FIXME: 
+  double simulationTime = 10; // Seconds
   std::string queueSize = "1000";
-  TrafficControlHelper tch;
-  tch.SetRootQueueDisc("ns3::FifoQueueDisc", "MaxSize", StringValue(queueSize + "p"));
-
-  /*
-  Node index:
-  0: A
-  1: E
-  2: G
-  3: S (Server)
-  4: B
-  5: F
-  6: C
-  7: D 
-  8: R (Router)
-  */
+  
   int deviceA = 0;
-  int deviceB = 4;
-  int deviceC = 6;
-  int deviceD = 7;
-  int nodeE = 1;
+  int deviceB = 1;
+  int deviceC = 2;
+  int deviceD = 3;
+  int nodeE = 4;
   int nodeF = 5;
-  int nodeG = 2;
-  int Server = 3;
+  int nodeG = 6;
+  int Server = 7;
   int Router = 8;
 
   NodeContainer nAnE = NodeContainer(nodes.Get(deviceA), nodes.Get(nodeE));
@@ -168,50 +160,94 @@ int main (int argc, char *argv[])
   NodeContainer nFnG = NodeContainer(nodes.Get(nodeF), nodes.Get(nodeG));
   NodeContainer nDnG = NodeContainer(nodes.Get(deviceC), nodes.Get(nodeG));
 
-  InternetStackHelper internet;
-  internet.Install (nodes);
-
   // We create the channels first without any IP addressing information
   NS_LOG_INFO ("Create channels.");
   // Constructing a point to point link
+
   PointToPointHelper pointToPoint;
-  pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
-  pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
- 
-  NetDeviceContainer dAdE = pointToPoint.Install(nAnE);
-  NetDeviceContainer dEdG = pointToPoint.Install(nEnG);
-  NetDeviceContainer dBdF = pointToPoint.Install(nBnF);
+  CsmaHelper csma;
+  
+  NetDeviceContainer dAdE;
+  NetDeviceContainer dEdG;
+  NetDeviceContainer dBdF;
+  NetDeviceContainer dCdF;
+  NetDeviceContainer dDdG;
+  NetDeviceContainer dFdG;
+  NetDeviceContainer dGdR;
+  NetDeviceContainer dGdS;
 
-  pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
-  pointToPoint.SetChannelAttribute ("Delay", StringValue ("0.5ms"));
+  if(model == "P2P")
+  {
+    //PointToPointHelper pointToPoint;
+    pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
+    pointToPoint.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue("1p"));
 
-  NetDeviceContainer dCdF = pointToPoint.Install(nCnF);
+    dAdE = pointToPoint.Install(nAnE);
+    dEdG = pointToPoint.Install(nEnG);
+    dBdF = pointToPoint.Install(nBnF);
 
-  pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
-  pointToPoint.SetChannelAttribute ("Delay", StringValue ("1ms"));
+    pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("0.5ms"));
 
-  NetDeviceContainer dDdG = pointToPoint.Install(nDnG);
+    dCdF = pointToPoint.Install(nCnF);
 
-  pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("8Mbps"));
+    pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("1ms"));
 
-  NetDeviceContainer dFdG = pointToPoint.Install(nFnG);
-  NetDeviceContainer dGdR = pointToPoint.Install(nGnR);
+    dDdG = pointToPoint.Install(nDnG);
 
-  pointToPoint.SetDeviceAttribute("DataRate", StringValue("10Mbps"));
-  pointToPoint.SetQueue("ns3::DropTailQueue");
+    pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("8Mbps"));
 
-  NetDeviceContainer dGdS = pointToPoint.Install(nGnS);
+    dFdG = pointToPoint.Install(nFnG);
+    dGdR = pointToPoint.Install(nGnR);
 
+    pointToPoint.SetDeviceAttribute("DataRate", StringValue("10Mbps"));
+    
+    dGdS = pointToPoint.Install(nGnS);
 
+  }
+  else if(model == "CSMA")
+  {
+    // CsmaHelper csma;
+    csma.SetChannelAttribute("DataRate", StringValue("5Mbps"));
+    csma.SetChannelAttribute("Delay", StringValue ("2ms"));
+    csma.SetQueue("ns3::DropTailQueue", "MaxSize", StringValue("10p"));
+
+    dAdE = csma.Install(nAnE);
+    dEdG = csma.Install(nEnG);
+    dBdF = csma.Install(nBnF);
+
+    csma.SetChannelAttribute("Delay", StringValue ("0.5ms"));
+
+    dCdF = csma.Install(nCnF);
+
+    csma.SetChannelAttribute("Delay", StringValue ("1ms"));
+
+    dDdG = csma.Install(nDnG);
+
+    csma.SetChannelAttribute("DataRate", StringValue("8Mbps"));
+    csma.SetChannelAttribute("Delay", StringValue ("2ms"));
+
+    dFdG = csma.Install(nFnG);
+    dGdR = csma.Install(nGnR);
+
+    csma.SetChannelAttribute("DataRate", StringValue("10Mbps"));
+    csma.SetChannelAttribute("Delay", StringValue ("2ms"));
+
+    dGdS = csma.Install(nGnS);
+  }
+  
+  InternetStackHelper internet;
+  internet.Install (nodes);
 
   //We have now constructed all the point-to-point links
   //Here we set qdiscs in order to track the traffic between NodeG and the Server
+  TrafficControlHelper tch;
+  tch.SetRootQueueDisc("ns3::FifoQueueDisc", "MaxSize", StringValue(queueSize + "p"));
   QueueDiscContainer qdiscs_G_to_Server = tch.Install(dGdS);
 
-
-
-  // Later, we add IP addresses.
-  // FIXME: Check if IP address are OK 
+  // IP addresses
   NS_LOG_INFO ("Assign IP Addresses.");
   Ipv4AddressHelper ipv4;
   ipv4.SetBase("10.1.1.0", "255.255.255.0");
@@ -241,14 +277,22 @@ int main (int argc, char *argv[])
   // Creates router nodes, initialize routing database and set up the routing tables in the nodes.
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
-  // TODO: Add AsciiTracerHelper and TcPacketsInQueue function
+  Ptr<OutputStreamWrapper> streamTrFile;
+  Ptr<OutputStreamWrapper> streamTxt;
   AsciiTraceHelper asciiTraceHelper;
-  Ptr<OutputStreamWrapper> stream = asciiTraceHelper.CreateFileStream("p2p_queue.txt");
 
-  for (float t = 1.0; t < 10; t += 0.001) {
-    Simulator::Schedule(Seconds(t), &TcPacketsInQueue, qdiscs_G_to_Server, stream);
+  if(model == "P2P"){
+    streamTrFile = asciiTraceHelper.CreateFileStream("queue_P2P.tr");
+    streamTxt = asciiTraceHelper.CreateFileStream("queue_P2P.txt");
   }
-  //:TODO_STOP
+  else if (model == "CSMA"){
+    streamTrFile = asciiTraceHelper.CreateFileStream("queue_CSMA.tr");
+    streamTxt = asciiTraceHelper.CreateFileStream("queue_CSMA.txt");
+  }
+
+  for (float t = 1.0; t < simulationTime; t += 0.001) {
+    Simulator::Schedule(Seconds(t), &TcPacketsInQueue, qdiscs_G_to_Server, streamTrFile, streamTxt);
+  }
 
   NS_LOG_INFO ("Create Applications.");
   //
@@ -268,7 +312,7 @@ int main (int argc, char *argv[])
 
   //Transmission Server (S)-> Router (R)
   Ptr<Socket> source1 = Socket::CreateSocket (nodes.Get (Server), tid);
-  InetSocketAddress remote1 = InetSocketAddress (iGiR.GetAddress (1), port_number); // FIXME: Check index
+  InetSocketAddress remote1 = InetSocketAddress (iGiR.GetAddress (1), port_number);
   source1->Connect (remote1);
 
   //Transmission Server (S) -> Client (A or B)
@@ -284,7 +328,7 @@ int main (int argc, char *argv[])
   //
   UdpServerHelper server (port_number);
   server_apps.Add(server.Install(nodes.Get (deviceA)));  
-  server_apps.Add(server.Install(nodes.Get (deviceB)));  //FIXME: Might Not Be Used, try romving later
+  server_apps.Add(server.Install(nodes.Get (deviceB))); 
   //-------------------------------Might Not Be Used-------------------------------------------
 
   // ####Using Sockets to generate traffic at node A and B  (i.e., exponential payload and inter-transmission time)####
@@ -327,8 +371,14 @@ int main (int argc, char *argv[])
   Simulator::ScheduleWithContext (sourceD->GetNode ()->GetId (), Seconds (2.0), &GenerateTraffic, sourceD, randomSize, randomTime_D);
   
   AsciiTraceHelper ascii;
-  pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("global-routing.tr"));
-  pointToPoint.EnablePcapAll ("global-routing");
+  if(model == "P2P"){
+    pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("global-routing.tr"));
+    pointToPoint.EnablePcapAll ("global-routing");
+  }
+  else if(model == "CSMA"){
+    csma.EnableAsciiAll (ascii.CreateFileStream ("global-routing.tr"));
+    csma.EnablePcapAll ("global-routing");
+  }
 
    // Flow Monitor
   FlowMonitorHelper flowmonHelper;

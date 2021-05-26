@@ -23,7 +23,7 @@ git checkout main
 ```
 
 ## Run
-`./waf --run "ns3RNG"`
+`../waf --run "ns3RNG --n=100000 --run_lcg=true --run_urv=true --run_erv=true"`
 
 `python RNGplot.py ./LCG.csv`
 

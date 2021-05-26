@@ -107,22 +107,34 @@ std::vector<double> ERV(double mean, double bound, int n){
 
 int main (int argc, char *argv[]){
     int n = 10000;
+    bool run_lcg = true;
+    bool run_urv = true;
+    bool run_erv = true;
 
     CommandLine cmd;
     cmd.AddValue("n","Number of generated values", n);
+    cmd.AddValue("run_lcg","Run linear congruentail generator", run_lcg);
+    cmd.AddValue("run_urv","Run linear congruentail generator", run_urv);
+    cmd.AddValue("run_erv","Run linear congruentail generator", run_erv);
 
     cmd.Parse(argc, argv);
 
-    //Seed, modulus, multiplier, increment, upper bound, amount
-    //std::vector<double> LCG_random_values = LCG(1, (std::pow(2,31)-1), std::pow(7, 5), 0, 1.0, n); //Uniform
-    std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 1.0, n);
-    std::vector<double> URV_random_values = URV(0,1, n);
-    std::vector<double> ERV_random_values = ERV(0.5, 1.0, n);
+    if(run_lcg){
+        //Seed, modulus, multiplier, increment, upper bound, amount
+        std::vector<double> LCG_random_values = LCG(1, (std::pow(2,31)-1), std::pow(7, 5), 0, 1.0, n); //Uniform
+       //std::vector<double> LCG_random_values = LCG(1, 100, 13, 1, 1.0, n);
+        writeToFile("LCG", LCG_random_values);
+    }
 
-    writeToFile("LCG", LCG_random_values);
-    writeToFile("URV", URV_random_values);
-    writeToFile("ERV", ERV_random_values);
+    if(run_urv){
+        std::vector<double> URV_random_values = URV(0,1, n);
+        writeToFile("URV", URV_random_values);
+    }
 
-
+    if(run_erv){
+        std::vector<double> ERV_random_values = ERV(0.5, 1.0, n);
+        writeToFile("ERV", ERV_random_values);
+    }
+    
     return 0;
 }

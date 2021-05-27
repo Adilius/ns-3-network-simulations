@@ -1,23 +1,57 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import csv
+import statistics
+from scipy.stats import poisson
+from scipy.optimize import curve_fit
+from scipy.special import factorial
 from scipy.stats import poisson
 import sys
+import itertools
 
-def plot_poisson(df, col=0, n_pts=100):
-    lm = df[col].mean() #get the mean value of your data
-    poisdata = np.random.poisson(lm, n_pts)
-    plt.hist(poisdata, density=True, alpha=0.5)
-    plt.ylabel('Frequency')
-    plt.xlabel('Value')
-    plt.title("Poisson")
-    plt.show()
+def fit_function(k, lamb):
+    return poisson.pmf(k, lamb)
+
 
 if(len(sys.argv) > 1):
     dataFilename = str(sys.argv[1])
-
     print('Generating plot from file ', dataFilename)
 
-    data = pd.read_csv(dataFilename, sep=',', header=None)
+    with open(dataFilename, newline='') as f:
+        reader = csv.reader(f, quoting=csv.QUOTE_NONNUMERIC)   # Read and convert all rows into floats
+        data = list(reader)
+        unpackedData = list(itertools.chain(*data))
+        #unpackedData = [x for l in data for x in l] #Unpack list
+        unsignedData = [x for x in unpackedData if x >= 0]  #Remove unsigned floats
 
-    plot_poisson(data)
+        bins = np.arange(11) - 0.5
+        entries, bin_edges, patches = plt.hist(unsignedData, bins=bins, density=True, label='Data')
+
+        # Calculate bin centres
+        bin_middles = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+
+        #Fit with curve_fit
+        parameters, cov_matrix = curve_fit(fit_function, bin_middles, entries)
+
+        # Plot with poisson-deviation with fitted parameter
+        x_plot = np.arange(0, 4)
+
+        plt.plot(
+            x_plot,
+            fit_function(x_plot, *parameters),
+            linestyle='',
+            label="Poisson"
+        )
+
+        #print(type(data))
+        #print(data)
+        #lambd = np.mean(unsignedData) #get the mean value
+
+
+        plt.ylabel('Frequency')
+        plt.xlabel('Value')
+        plt.title("Poisson")
+        plt.legend()
+        plt.show()
+

@@ -41,7 +41,6 @@ if(len(sys.argv) > 1):
             x_plot,
             fit_function(x_plot, *parameters),
             linestyle='',
-            label="Poisson"
         )
 
         #print(type(data))

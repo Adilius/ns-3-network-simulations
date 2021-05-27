@@ -106,7 +106,7 @@ std::vector<double> ERV(double mean, double bound, int n){
 }
 /*
 vector<double> U - vector with values to be transformed
-double lambda - 
+double lambda - the rate
 Transforms vector using inverse transform algorithm into poisson distrbution in-place
 */
 void poisson(std::vector<double> &U, double lambda){
@@ -147,7 +147,7 @@ int main (int argc, char *argv[]){
     }
 
     if(run_erv){
-        std::vector<double> ERV_random_values = ERV(0.5, 1.0, n);
+        std::vector<double> ERV_random_values = ERV(2, 4, n);
         writeToFile("ERV", ERV_random_values);
     }if(run_poi){
         std::vector<double> POI_random_values = LCG(1, (std::pow(2,31)-1), std::pow(7, 5), 0, 1.0, n); //Uniform

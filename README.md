@@ -23,12 +23,22 @@ git checkout main
 ```
 
 ## Run
-`../waf --run "ns3RNG --n=100000 --run_lcg=true --run_urv=true --run_erv=true --run_poi=true"`
+Run random variable generation 
+- `../waf --run "ns3RNG --n=100000 --run_lcg=true --run_urv=true --run_erv=true --run_poi=true"`
 
-`python RNGplot.py ./LCG.csv`
-`python Poissonplot.py ./Poisson.csv`
+Plot LCG, URV, ERV
+
+- `python RNGplot.py ./LCG.csv`
+
+Plot Poisson
+
+- `python Poissonplot.py ./Poisson.csv`
 
 ## Results
 ![LCG](https://user-images.githubusercontent.com/43440295/119241584-d4b34780-bb57-11eb-9a82-ad91720f7595.png)
-![RVN](https://user-images.githubusercontent.com/43440295/119241585-d54bde00-bb57-11eb-8a94-93edfc7cbd9c.png)
+![LCG_UNIFORM](https://user-images.githubusercontent.com/43440295/119853908-e5c1d700-bf10-11eb-8207-9114cefb69b1.png)
 ![URV](https://user-images.githubusercontent.com/43440295/119241586-d54bde00-bb57-11eb-870a-252e4502e896.png)
+![Poisson](https://user-images.githubusercontent.com/43440295/119853949-ef4b3f00-bf10-11eb-8a9e-76f68a6de3ec.png)
+![ERV](https://user-images.githubusercontent.com/43440295/119853876-dd699c00-bf10-11eb-89ce-6c80592dee12.png)
+
+

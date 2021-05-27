@@ -2,7 +2,7 @@
 
 #include <string>
 #include <algorithm>
-#include <cmath>
+#include <cmath>    //log, 
 
 using namespace ns3;
 
@@ -104,18 +104,33 @@ std::vector<double> ERV(double mean, double bound, int n){
 
     return generatedValues;
 }
+/*
+vector<double> U - vector with values to be transformed
+double lambda - 
+Transforms vector using inverse transform algorithm into poisson distrbution in-place
+*/
+void poisson(std::vector<double> &U, double lambda){
+    double rounding = 0.0001; // Used for rounding
+
+    for(uint i = 0; i < U.size(); i++){
+        U[i] = -(std::log(U[i])/lambda); //Transformation
+        U[i] = (int)(U[i]/rounding)*rounding;  //Rounds to 5 decimals
+    }
+}
 
 int main (int argc, char *argv[]){
     int n = 10000;
     bool run_lcg = true;
     bool run_urv = true;
     bool run_erv = true;
+    bool run_poi = true;
 
     CommandLine cmd;
     cmd.AddValue("n","Number of generated values", n);
     cmd.AddValue("run_lcg","Run linear congruentail generator", run_lcg);
-    cmd.AddValue("run_urv","Run linear congruentail generator", run_urv);
-    cmd.AddValue("run_erv","Run linear congruentail generator", run_erv);
+    cmd.AddValue("run_urv","Run Uniform Random Variable", run_urv);
+    cmd.AddValue("run_erv","Run Exponential Random Variable", run_erv);
+    cmd.AddValue("run_poi","Run poisson distribution on LCG", run_poi);
 
     cmd.Parse(argc, argv);
 
@@ -134,7 +149,13 @@ int main (int argc, char *argv[]){
     if(run_erv){
         std::vector<double> ERV_random_values = ERV(0.5, 1.0, n);
         writeToFile("ERV", ERV_random_values);
+    }if(run_poi){
+        std::vector<double> POI_random_values = LCG(1, (std::pow(2,31)-1), std::pow(7, 5), 0, 1.0, n); //Uniform
+        poisson(POI_random_values, 2); //Transform into poisson
+        writeToFile("Poisson", POI_random_values);
     }
+
+
     
     return 0;
 }

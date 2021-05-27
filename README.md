@@ -23,9 +23,10 @@ git checkout main
 ```
 
 ## Run
-`../waf --run "ns3RNG --n=100000 --run_lcg=true --run_urv=true --run_erv=true"`
+`../waf --run "ns3RNG --n=100000 --run_lcg=true --run_urv=true --run_erv=true --run_poi=true"`
 
 `python RNGplot.py ./LCG.csv`
+`python Poissonplot.py ./Poisson.csv`
 
 ## Results
 ![LCG](https://user-images.githubusercontent.com/43440295/119241584-d4b34780-bb57-11eb-9a82-ad91720f7595.png)

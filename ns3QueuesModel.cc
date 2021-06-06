@@ -73,7 +73,7 @@ void TcPacketsInQueue(QueueDiscContainer qdiscs, Ptr<OutputStreamWrapper> stream
     std::cout << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;                   //Writes to terminal
 
     //If queue is from g to Server
-    if(i == 0){
+    if(true){
       totalQueuedPackets += size;
       totalAmountQueues++;
     } 
@@ -408,8 +408,8 @@ int main (int argc, char *argv[])
  
   Simulator::Destroy ();
   std::cout << std::endl << "*** Simulation statistics: ***" << std::endl;
-  std::cout << "  Total buffer size: " << totalQueuedPackets << std::endl;
+  std::cout << "  Total queued packets: " << totalQueuedPackets << std::endl;
 	std::cout << "  Total amount of recordings: " << totalAmountQueues << std::endl;
-	std::cout << "  Average buffer size: " << ((double)totalQueuedPackets/(double)totalAmountQueues) << std::endl;
+	std::cout << "  Average queue size: " << ((double)totalQueuedPackets/(double)totalAmountQueues) << std::endl;
   return 0;
 }

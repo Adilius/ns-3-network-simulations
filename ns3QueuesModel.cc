@@ -57,6 +57,9 @@
 
 using namespace ns3;
 
+uint32_t totalQueuedPackets;
+uint32_t totalAmountQueues;
+
 NS_LOG_COMPONENT_DEFINE ("NS3QUEUESMODEL");
 
 void TcPacketsInQueue(QueueDiscContainer qdiscs, Ptr<OutputStreamWrapper> streamTrFile, Ptr<OutputStreamWrapper> streamTxt) {
@@ -65,9 +68,15 @@ void TcPacketsInQueue(QueueDiscContainer qdiscs, Ptr<OutputStreamWrapper> stream
   for (uint32_t i = 0; i < nQueueDiscs; ++i) {
     Ptr<QueueDisc> p = qdiscs.Get(i);
     uint32_t size = p->GetNPackets();
-    *streamTrFile->GetStream() << Simulator::Now().GetSeconds() << "\t Packets in queue: " << size << std::endl;
-    *streamTxt->GetStream() << Simulator::Now().GetSeconds() << "\t Packets in queue: " << size << std::endl;
-    std::cout << Simulator::Now().GetSeconds() << "\t Packets in queue: " << size << std::endl;
+    *streamTrFile->GetStream() << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;  //Writes to trace file .tr
+    *streamTxt->GetStream() << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;     //Writes to text file .txt
+    std::cout << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;                   //Writes to terminal
+
+    //If queue is from g to Server
+    if(i == 0){
+      totalQueuedPackets += size;
+      totalAmountQueues++;
+    } 
   }
 }
 
@@ -397,6 +406,10 @@ int main (int argc, char *argv[])
     flowmonHelper.SerializeToXmlFile ("global-routing.flowmon", false, false);
   }
  
-   Simulator::Destroy ();
-   return 0;
+  Simulator::Destroy ();
+  std::cout << std::endl << "*** Simulation statistics: ***" << std::endl;
+  std::cout << "  Total buffer size: " << totalQueuedPackets << std::endl;
+	std::cout << "  Total amount of recordings: " << totalAmountQueues << std::endl;
+	std::cout << "  Average buffer size: " << ((double)totalQueuedPackets/(double)totalAmountQueues) << std::endl;
+  return 0;
 }

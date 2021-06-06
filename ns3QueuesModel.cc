@@ -95,7 +95,7 @@ static void received_msg (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Pa
 	else{
 		//std::cout << "::::: Server Replies to Sender   "  << std::endl;
 		socket2->SendTo(Create<Packet> (p->GetSize ()),0,srcAddress);
-    std::cout << "::::: A packet sent to A from the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
+    //std::cout << "::::: A packet sent to A from the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
 	}
 }
 

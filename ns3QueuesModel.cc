@@ -71,7 +71,7 @@ void TcPacketsInQueue(QueueDiscContainer qdiscs, Ptr<OutputStreamWrapper> stream
     *streamTrFile->GetStream() << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;  //Writes to trace file .tr
     *streamTxt->GetStream() << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;     //Writes to text file .txt
     *streamCSV->GetStream() << Simulator::Now().GetSeconds() << ", " << size << std::endl;                                   //Writes to CSV file  .csv
-    std::cout << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;                   //Writes to terminal
+    //std::cout << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;                   //Writes to terminal
 
     //If queue is from g to Server
     if(i == 0){
@@ -95,8 +95,13 @@ static void received_msg (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Pa
 	else{
 		//std::cout << "::::: Server Replies to Sender   "  << std::endl;
 		socket2->SendTo(Create<Packet> (p->GetSize ()),0,srcAddress);
-    std::cout << "::::: A packet received at A from the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
+    std::cout << "::::: A packet sent to A from the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
 	}
+}
+
+static void received_msg_A (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Packet> p, const Address &srcAddress , const Address &dstAddress)
+{
+	std::cout << "::::: A packet received at the A! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
 }
 
 static void GenerateTraffic (Ptr<Socket> socket, Ptr<ExponentialRandomVariable> randomSize,	Ptr<ExponentialRandomVariable> randomTime)
@@ -329,20 +334,20 @@ int main (int argc, char *argv[])
 
   TypeId tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
 
-  //Transmission Server (S)-> Router (R)
+  //Transmission Server (S) -> Client (A)
   Ptr<Socket> source1 = Socket::CreateSocket (nodes.Get (Server), tid);
-  InetSocketAddress remote1 = InetSocketAddress (iGiR.GetAddress (1), port_number);
+  InetSocketAddress remote1 = InetSocketAddress (iAiE.GetAddress (1), port_number);
   source1->Connect (remote1);
 
-  //Transmission Server (S) -> Client (A)
-  Ptr<Socket> source2 = Socket::CreateSocket (nodes.Get (Server), tid);
+  //Transmission Server (A) -> Client (S)
+  Ptr<Socket> source2 = Socket::CreateSocket (nodes.Get (deviceA), tid);
   //TODO: Jonas la till denna kod för att connecta A -> S, kan va helgalet
-  InetSocketAddress remote2 = InetSocketAddress (iAiE.GetAddress (1), port_number);
+  InetSocketAddress remote2 = InetSocketAddress (iGiS.GetAddress (1), port_number);
   source2->Connect (remote2);
   //TODO: ^^^
 
   S1->TraceConnectWithoutContext ("RxWithAddresses", MakeBoundCallback (&received_msg, source1, source2));
-
+  S1->TraceConnectWithoutContext ("RxWithAddresses", MakeBoundCallback (&received_msg_A, source2, source1));
   server_apps.Start (Seconds (1.0));
   server_apps.Stop (Seconds (10.0));
 

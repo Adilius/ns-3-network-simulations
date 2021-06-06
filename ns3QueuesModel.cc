@@ -62,7 +62,7 @@ uint32_t totalAmountQueues;
 
 NS_LOG_COMPONENT_DEFINE ("NS3QUEUESMODEL");
 
-void TcPacketsInQueue(QueueDiscContainer qdiscs, Ptr<OutputStreamWrapper> streamTrFile, Ptr<OutputStreamWrapper> streamTxt) {
+void TcPacketsInQueue(QueueDiscContainer qdiscs, Ptr<OutputStreamWrapper> streamTrFile, Ptr<OutputStreamWrapper> streamTxt, Ptr<OutputStreamWrapper> streamCSV) {
 
   uint32_t nQueueDiscs = qdiscs.GetN();
   for (uint32_t i = 0; i < nQueueDiscs; ++i) {
@@ -70,10 +70,11 @@ void TcPacketsInQueue(QueueDiscContainer qdiscs, Ptr<OutputStreamWrapper> stream
     uint32_t size = p->GetNPackets();
     *streamTrFile->GetStream() << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;  //Writes to trace file .tr
     *streamTxt->GetStream() << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;     //Writes to text file .txt
+    *streamCSV->GetStream() << Simulator::Now().GetSeconds() << ", " << size << std::endl;                                   //Writes to CSV file  .csv
     std::cout << Simulator::Now().GetSeconds() << "\t" << i << " Packets in queue: " << size << std::endl;                   //Writes to terminal
 
     //If queue is from g to Server
-    if(true){
+    if(i == 0){
       totalQueuedPackets += size;
       totalAmountQueues++;
     } 
@@ -83,7 +84,7 @@ void TcPacketsInQueue(QueueDiscContainer qdiscs, Ptr<OutputStreamWrapper> stream
 // Forwards a packet received by the Server back to the source of the message with probability p=0.7 or to a third node R with probability 1-p.
 static void received_msg (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Packet> p, const Address &srcAddress , const Address &dstAddress)
 {
-	//std::cout << "::::: A packet received at the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
+	std::cout << "::::: A packet received at the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
 	
 	Ptr<UniformRandomVariable> rand=CreateObject<UniformRandomVariable>();
 	
@@ -94,6 +95,7 @@ static void received_msg (Ptr<Socket> socket1, Ptr<Socket> socket2, Ptr<const Pa
 	else{
 		//std::cout << "::::: Server Replies to Sender   "  << std::endl;
 		socket2->SendTo(Create<Packet> (p->GetSize ()),0,srcAddress);
+    std::cout << "::::: A packet received at A from the Server! Time:   " << Simulator::Now ().GetSeconds () << std::endl;
 	}
 }
 
@@ -146,6 +148,8 @@ int main (int argc, char *argv[])
 
   double simulationTime = 10; // Seconds
   std::string queueSize = "1000";
+  /*
+  */
   
   int deviceA = 0;
   int deviceB = 1;
@@ -250,11 +254,14 @@ int main (int argc, char *argv[])
   InternetStackHelper internet;
   internet.Install (nodes);
 
+  //Set Link to keep watch over
+  NetDeviceContainer linkOverWatch = dFdG;
+
   //We have now constructed all the point-to-point links
   //Here we set qdiscs in order to track the traffic between NodeG and the Server
   TrafficControlHelper tch;
   tch.SetRootQueueDisc("ns3::FifoQueueDisc", "MaxSize", StringValue(queueSize + "p"));
-  QueueDiscContainer qdiscs_G_to_Server = tch.Install(dGdS);
+  QueueDiscContainer qdiscs_G_to_Server = tch.Install(dFdG);
 
   // IP addresses
   NS_LOG_INFO ("Assign IP Addresses.");
@@ -288,19 +295,22 @@ int main (int argc, char *argv[])
 
   Ptr<OutputStreamWrapper> streamTrFile;
   Ptr<OutputStreamWrapper> streamTxt;
+  Ptr<OutputStreamWrapper> streamCSV;
   AsciiTraceHelper asciiTraceHelper;
 
   if(model == "P2P"){
     streamTrFile = asciiTraceHelper.CreateFileStream("queue_P2P.tr");
     streamTxt = asciiTraceHelper.CreateFileStream("queue_P2P.txt");
+    streamCSV = asciiTraceHelper.CreateFileStream("queue_P2P.csv");
   }
   else if (model == "CSMA"){
     streamTrFile = asciiTraceHelper.CreateFileStream("queue_CSMA.tr");
     streamTxt = asciiTraceHelper.CreateFileStream("queue_CSMA.txt");
+    streamCSV = asciiTraceHelper.CreateFileStream("queue_CSMA.csv");
   }
 
   for (float t = 1.0; t < simulationTime; t += 0.001) {
-    Simulator::Schedule(Seconds(t), &TcPacketsInQueue, qdiscs_G_to_Server, streamTrFile, streamTxt);
+    Simulator::Schedule(Seconds(t), &TcPacketsInQueue, qdiscs_G_to_Server, streamTrFile, streamTxt, streamCSV);
   }
 
   NS_LOG_INFO ("Create Applications.");
@@ -324,8 +334,12 @@ int main (int argc, char *argv[])
   InetSocketAddress remote1 = InetSocketAddress (iGiR.GetAddress (1), port_number);
   source1->Connect (remote1);
 
-  //Transmission Server (S) -> Client (A or B)
+  //Transmission Server (S) -> Client (A)
   Ptr<Socket> source2 = Socket::CreateSocket (nodes.Get (Server), tid);
+  //TODO: Jonas la till denna kod för att connecta A -> S, kan va helgalet
+  InetSocketAddress remote2 = InetSocketAddress (iAiE.GetAddress (1), port_number);
+  source2->Connect (remote2);
+  //TODO: ^^^
 
   S1->TraceConnectWithoutContext ("RxWithAddresses", MakeBoundCallback (&received_msg, source1, source2));
 
@@ -407,7 +421,7 @@ int main (int argc, char *argv[])
   }
  
   Simulator::Destroy ();
-  std::cout << std::endl << "*** Simulation statistics: ***" << std::endl;
+  std::cout << std::endl << "*** Simulation statistics " << model << ": ***" << std::endl;
   std::cout << "  Total queued packets: " << totalQueuedPackets << std::endl;
 	std::cout << "  Total amount of recordings: " << totalAmountQueues << std::endl;
 	std::cout << "  Average queue size: " << ((double)totalQueuedPackets/(double)totalAmountQueues) << std::endl;
